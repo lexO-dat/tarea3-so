@@ -5,21 +5,19 @@
 #include <algorithm>
 #include <random>
 #include <thread>
-#include <chrono>
+#include <ctime>
 
 using namespace std;
-using namespace std::chrono;
 
-// Clase que representa al proceso
-class Proceso {
+class Process {
 public:
     int pid;
-    int size_kb;
+    int sizeKb;
     int pages;
 
-    Proceso() : pid(0), size_kb(0), pages(0) {}
-    Proceso(int id, int size, int page_size) : pid(id), size_kb(size) {
-        pages = (size + page_size - 1) / page_size;
+    Process() : pid(0), sizeKb(0), pages(0) {}
+    Process(int id, int size, int pageSize) : pid(id), sizeKb(size) {
+        pages = (size + pageSize - 1) / pageSize;
     }
 };
 
@@ -31,135 +29,134 @@ int randomInt(int min, int max) {
     return dist(gen);
 }
 
-// Parametros de inicializacion de la memoria (donde se pide los tamaños y se asignan los valores en kb dsps)
-void MemoryInitializer(int &physical_pages, int &virtual_pages, int &page_size) {
-    int physical_memory_mb;
+void memoryInitializer(int &physicalPages, int &virtualPages, int &pageSize) {
+    int physicalMemoryMb;
     cout << "Ingrese el tamaño de la memoria física (MB): ";
-    cin >> physical_memory_mb;
+    cin >> physicalMemoryMb;
 
     cout << "Ingrese el tamaño de cada página (KB): ";
-    cin >> page_size;
+    cin >> pageSize;
 
-    int physical_memory_kb = physical_memory_mb * 1024;
-    int virtual_memory_kb = randomInt(physical_memory_kb * 1.5, physical_memory_kb * 4.5);
+    int physicalMemoryKb = physicalMemoryMb * 1024;
+    int virtualMemoryKb = randomInt(physicalMemoryKb * 1.5, physicalMemoryKb * 4.5);
 
-    physical_pages = physical_memory_kb / page_size;
-    virtual_pages = virtual_memory_kb / page_size;
+    physicalPages = physicalMemoryKb / pageSize;
+    virtualPages = virtualMemoryKb / pageSize;
 
-    cout << "Memoria física: " << physical_memory_kb << " KB (" << physical_pages << " páginas)\n";
-    cout << "Memoria virtual: " << virtual_memory_kb << " KB (" << virtual_pages << " páginas)\n";
+    cout << "Memoria física: " << physicalMemoryKb << " KB (" << physicalPages << " páginas)\n";
+    cout << "Memoria virtual: " << virtualMemoryKb << " KB (" << virtualPages << " páginas)\n";
 }
 
-// simulacion de la paginacion utilizando FIFO
-void PagSim() {
-    int physical_pages, virtual_pages, page_size;
-    MemoryInitializer(physical_pages, virtual_pages, page_size);
+// void de la simulacionn
+void pagSim() {
+    int physicalPages, virtualPages, pageSize;
+    memoryInitializer(physicalPages, virtualPages, pageSize);
 
-    list<pair<int, int>> ram;          // RAM usamos list para que sea un poco mas optima la insercion y eliminacion
-    list<pair<int, int>> swap_space;   // Swap
-    unordered_map<int, Proceso> processes; // Procesos
-    int pid_counter = 1;
+    list<pair<int, int>> ram;          //usamos un list para la ram y el swap ya que es un poco mas rapido de insertar y eliminar
+    list<pair<int, int>> swapSpace;
+    unordered_map<int, Process> processes;
+    int pidCounter = 1;
 
-    int process_min_size, process_max_size;
+    int processMinSize, processMaxSize;
     cout << "Ingrese el tamaño mínimo de los procesos (KB): ";
-    cin >> process_min_size;
+    cin >> processMinSize;
     cout << "Ingrese el tamaño máximo de los procesos (KB): ";
-    cin >> process_max_size;
+    cin >> processMaxSize;
 
-    auto start_time = steady_clock::now();
+    time_t startTime = time(nullptr);
 
     while (true) {
-        auto current_time = steady_clock::now();
-        auto elapsed_time = duration_cast<seconds>(current_time - start_time).count();
+        time_t currentTime = time(nullptr);
+        double elapsedTime = difftime(currentTime, startTime);
 
         // Creacion de un proceso cada 2 segundos
-        if (elapsed_time % 2 == 0) {
-            int process_size = randomInt(process_min_size, process_max_size); // Tamaño
-            Proceso new_process(pid_counter, process_size, page_size); // Creacion del proceso
-            processes.emplace(pid_counter, new_process); // Agregado del proceso a la lista de procesos
-            cout << "\nCreando proceso " << pid_counter << " con tamaño " << process_size
-                 << " KB (" << new_process.pages << " páginas)\n";
+        if (static_cast<int>(elapsedTime) % 2 == 0) {
+            int processSize = randomInt(processMinSize, processMaxSize); // Tamaño
+            Process newProcess(pidCounter, processSize, pageSize); // Creacion del proceso
+            processes.emplace(pidCounter, newProcess); // Agregado del proceso a la lista de procesos
+            cout << "\nCreando proceso " << pidCounter << " con tamaño " << processSize
+                 << " KB (" << newProcess.pages << " páginas)\n";
 
             // Carga de las paginas a la memoria si hay espacio o si no lo carga en swap
-            for (int page = 0; page < new_process.pages; ++page) {
-                if (ram.size() < physical_pages) {
-                    ram.push_back({pid_counter, page});
-                    cout << "-> Página (" << pid_counter << ", " << page << ") cargada en RAM.\n";
-                } else if (swap_space.size() < virtual_pages - physical_pages) {
-                    swap_space.push_back({pid_counter, page});
-                    cout << "-> Página (" << pid_counter << ", " << page << ") cargada en Swap.\n";
+            for (int page = 0; page < newProcess.pages; ++page) {
+                if (ram.size() < physicalPages) {
+                    ram.push_back({pidCounter, page});
+                    cout << "-> Página (" << pidCounter << ", " << page << ") cargada en RAM.\n";
+                } else if (swapSpace.size() < virtualPages - physicalPages) {
+                    swapSpace.push_back({pidCounter, page});
+                    cout << "-> Página (" << pidCounter << ", " << page << ") cargada en Swap.\n";
                 } else {
-                    cout << "\n¡Memoria llena! Terminando simulación.\n";
+                    cout << "\nMemoria llena! Terminando simulación.\n";
                     return;
                 }
             }
-            pid_counter++;
+            pidCounter++;
             this_thread::sleep_for(chrono::seconds(2));
         }
 
         // Eventos pasados 30 segundos
-        if (elapsed_time >= 1 && (elapsed_time - 30) % 5 == 0) {
+        if (elapsedTime >= 1 && (static_cast<int>(elapsedTime) - 30) % 5 == 0) {
             // ELiminacion de un random cada 5 segundos
             if (!processes.empty()) {
-                int pid_to_kill = randomInt(1, pid_counter - 1);
-                while (processes.find(pid_to_kill) == processes.end()) {
-                    pid_to_kill = randomInt(1, pid_counter - 1);
+                int pidToKill = randomInt(1, pidCounter - 1);
+                while (processes.find(pidToKill) == processes.end()) {
+                    pidToKill = randomInt(1, pidCounter - 1);
                 }
-                cout << "\nTerminando proceso " << pid_to_kill << "\n";
+                cout << "\nTerminando proceso " << pidToKill << "\n";
 
-                auto remove_pages = [&](list<pair<int, int>> &memory) {
-                    memory.remove_if([pid_to_kill](pair<int, int> page) {
-                        return page.first == pid_to_kill;
+                auto removePages = [&](list<pair<int, int>> &memory) {
+                    memory.remove_if([pidToKill](pair<int, int> page) {
+                        return page.first == pidToKill;
                     });
                 };
 
-                remove_pages(ram);
-                remove_pages(swap_space);
-                processes.erase(pid_to_kill);
+                removePages(ram);
+                removePages(swapSpace);
+                processes.erase(pidToKill);
             }
 
             // Acceso a una direccion virtual random cada 5 segundos
             if (!processes.empty()) {
-                int random_pid = randomInt(1, pid_counter - 1);
-                while (processes.find(random_pid) == processes.end()) {
-                    random_pid = randomInt(1, pid_counter - 1);
+                int randomPid = randomInt(1, pidCounter - 1);
+                while (processes.find(randomPid) == processes.end()) {
+                    randomPid = randomInt(1, pidCounter - 1);
                 }
-                auto &process = processes[random_pid];
-                int random_page = randomInt(0, process.pages - 1);
-                int virtual_address = random_page * page_size * 1024 + randomInt(0, page_size * 1024 - 1);
+                auto &process = processes[randomPid];
+                int randomPage = randomInt(0, process.pages - 1);
+                int virtualAddress = randomPage * pageSize * 1024 + randomInt(0, pageSize * 1024 - 1);
 
-                cout << "\nAccediendo a dirección virtual " << virtual_address << " del proceso " << random_pid << "\n";
-                cout << "Correspondiente a página " << random_page << "\n";
+                cout << "\nAccediendo a dirección virtual " << virtualAddress << " del proceso " << randomPid << "\n";
+                cout << "Correspondiente a página " << randomPage << "\n";
 
-                auto page_pair = make_pair(random_pid, random_page);
-                auto it = find(ram.begin(), ram.end(), page_pair);
+                auto pagePair = make_pair(randomPid, randomPage);
+                auto it = find(ram.begin(), ram.end(), pagePair);
                 if (it != ram.end()) {
                     cout << "¡Página encontrada en RAM!\n";
                 } else {
-                    cout << "¡Page fault! Realizando swapping...\n";
+                    cout << "Page fault! Realizando swapping...\n";
 
                     // Si es que detecto que la pagina esta en swap se carga a ram
-                    if (ram.size() < physical_pages) {
-                        ram.push_back(page_pair);
-                        swap_space.remove(page_pair);
-                        cout << "-> Página " << random_page << " del proceso " << random_pid << " cargada en RAM.\n";
+                    if (ram.size() < physicalPages) {
+                        ram.push_back(pagePair);
+                        swapSpace.remove(pagePair);
+                        cout << "-> Página " << randomPage << " del proceso " << randomPid << " cargada en RAM.\n";
                     } else {
                         // Se cambia por la primera pagina de la lista de ram (FIFO)
-                        auto page_to_swap = ram.front();
+                        auto pageToSwap = ram.front();
                         ram.pop_front();
 
-                        if (swap_space.size() < virtual_pages - physical_pages) {
-                            swap_space.push_back(page_to_swap);
-                            cout << "-> Swapping página (" << page_to_swap.first << ", " << page_to_swap.second << ") de RAM a Swap.\n";
+                        if (swapSpace.size() < virtualPages - physicalPages) {
+                            swapSpace.push_back(pageToSwap);
+                            cout << "-> Swapping página (" << pageToSwap.first << ", " << pageToSwap.second << ") de RAM a Swap.\n";
                         } else {
-                            cout << "\n¡Swap lleno! Terminando simulación.\n";
+                            cout << "\nSwap lleno! Terminando simulación.\n";
                             return;
                         }
 
                         // cARGA la pagina a ram
-                        ram.push_back(page_pair);
-                        swap_space.remove(page_pair);
-                        cout << "-> Página (" << random_pid << ", " << random_page << ") cargada en RAM.\n";
+                        ram.push_back(pagePair);
+                        swapSpace.remove(pagePair);
+                        cout << "-> Página (" << randomPid << ", " << randomPage << ") cargada en RAM.\n";
                     }
                 }
             }
@@ -167,7 +164,7 @@ void PagSim() {
         }
 
         // Chequeo si la memoria tanto fisica como virtual estan llenas y si lo estan termina la simulacion
-        if (ram.size() == physical_pages && swap_space.size() == virtual_pages - physical_pages) {
+        if (ram.size() == physicalPages && swapSpace.size() == virtualPages - physicalPages) {
             cout << "\n¡Memoria llena! Terminando simulación.\n";
             return;
         }
@@ -177,6 +174,6 @@ void PagSim() {
 }
 
 int main() {
-    PagSim();
+    pagSim();
     return 0;
 }
